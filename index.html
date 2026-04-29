@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PortView</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#0f172a;color:#e2e8f0}
+header,main{max-width:1100px;margin:0 auto;padding:24px}
+.card{background:#111827;border:1px solid #334155;border-radius:14px;padding:16px;margin:12px 0}
+input,button,textarea{padding:10px;border-radius:10px;border:1px solid #475569;background:#0b1220;color:#e2e8f0}
+button{cursor:pointer}
+table{width:100%;border-collapse:collapse}
+td,th{padding:10px;border-bottom:1px solid #334155;text-align:left}
+.small{color:#94a3b8}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header><h1>{{.AppName}}</h1><div class="small">端口查询 / 自动分配 / 分配区间</div><div class="small">version: v1.0 2026-04-29 author@longan55</div></header>
+<main>
+<div class="card">
+
+<div class="row" style="margin-top:12px">
+<div style="display:flex;align-items:center;gap:8px">
+<button type="button" id="protocolTcp" onclick="setProtocol('tcp')">TCP</button>
+<button type="button" id="protocolUdp" onclick="setProtocol('udp')">UDP</button>
+</div>
+</div>
+
+<div class="row" style="margin-top:12px">
+<input id="portRange" placeholder="分配区间，例如 9100-10000">
+<button onclick="saveRange()">保存区间</button>
+</div>
+
+<div class="row" style="margin-top:12px">
+<input id="service" placeholder="端口用途">
+<button onclick="allocate()">自动分配</button>
+</div>
+
+<div class="row" style="margin-top:12px">
+<input id="manualPort" placeholder="指定端口号">
+<button onclick="manualAllocate()">手动分配</button>
+</div>
+
+<div class="row" style="margin-top:12px">
+<button onclick="loadPorts()">刷新数据</button>
+</div>
+
+<div class="row" style="margin-top:12px">
+<button onclick="showTab('scan')">已使用端口</button>
+<button onclick="showTab('allocated')">已分配未使用</button>
+<button onclick="showTab('managed')">已管理端口</button>
+</div>
+
+<div class="small" style="margin-top:8px">当前自动分配区间：<span id="currentRange">TCP: {{.TcpPortRange}} / UDP: {{.UdpPortRange}}</span></div>
+</div>
+
+<div class="card" id="tab-scan">
+<h3>已使用端口</h3>
+<table>
+<thead><tr><th>端口</th><th>服务</th><th>协议</th><th>来源</th><th>更新时间</th></tr></thead>
+<tbody id="scanPorts"></tbody>
+</table>
+</div>
+
+<div class="card" id="tab-allocated" style="display:none">
+<h3>已分配但未使用</h3>
+<table>
+<thead><tr><th>端口</th><th>服务</th><th>协议</th><th>状态</th><th>来源</th><th>操作</th><th>更新时间</th></tr></thead>
+<tbody id="allocatedPorts"></tbody>
+</table>
+</div>
+
+<div class="card" id="tab-managed" style="display:none">
+<h3>已管理端口</h3>
+<table>
+<thead><tr><th>端口</th><th>服务</th><th>协议</th><th>状态</th><th>来源</th><th>操作</th><th>更新时间</th></tr></thead>
+<tbody id="ports"></tbody>
+</table>
+</div>
+</main>
+
+<script>
+function showTab(name){
+ document.getElementById('tab-scan').style.display = name === 'scan' ? 'block' : 'none';
+ document.getElementById('tab-allocated').style.display = name === 'allocated' ? 'block' : 'none';
+ document.getElementById('tab-managed').style.display = name === 'managed' ? 'block' : 'none';
+}
+function setProtocol(protocol){
+ window.selectedProtocol = protocol;
+ document.getElementById('protocolTcp').style.opacity = protocol === 'tcp' ? '1' : '0.5';
+ document.getElementById('protocolUdp').style.opacity = protocol === 'udp' ? '1' : '0.5';
+ const rangeData = window.rangeCache || { tcp_port_range: '', udp_port_range: '' };
+ document.getElementById('portRange').value = protocol === 'udp' ? rangeData.udp_port_range : rangeData.tcp_port_range;
+}
+async function saveRange(){
+ const protocol=window.selectedProtocol || 'tcp';
+ const range=document.getElementById('portRange').value;
+ const res=await fetch('/api/config/range?protocol='+encodeURIComponent(protocol),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({port_range:range,protocol:protocol})});
+ if(!res.ok){alert('保存区间失败');return;}
+ const data=await res.json();
+ window.rangeCache = data;
+ document.getElementById('currentRange').textContent='TCP: '+data.tcp_port_range+' / UDP: '+data.udp_port_range;
+}
+async function manualAllocate(){
+ const service=document.getElementById('service').value.trim();
+ const port=document.getElementById('manualPort').value.trim();
+ if(!service){alert('请先填写端口用途');return;}
+ if(!port){alert('请先填写指定端口号');return;}
+ const protocol=window.selectedProtocol || 'tcp';
+ const res=await fetch('/api/allocate/manual?service='+encodeURIComponent(service)+'&port='+encodeURIComponent(port)+'&protocol='+encodeURIComponent(protocol),{method:'POST'});
+ if(!res.ok){
+  const err=await res.json().catch(function(){return {error:'手动分配失败'};});
+  alert(err.error||'手动分配失败');
+  return;
+ }
+ document.getElementById('service').value = '';
+ document.getElementById('manualPort').value = '';
+ showTab('managed');
+ await loadPorts();
+}
+async function releasePort(port){
+ const res=await fetch('/api/ports/release/'+port+'?protocol='+(window.selectedProtocol || 'tcp'),{method:'DELETE'});
+ if(!res.ok){alert('释放失败');return;}
+ await loadPorts();
+}
+async function loadPorts(){
+ const res=await fetch('/api/ports');
+ const data=await res.json();
+ document.getElementById('ports').innerHTML=(data.data||[]).map(function(x){return '<tr><td>'+x.port+'</td><td>'+(x.service||'')+'</td><td>'+(x.protocol||'')+'</td><td>'+(x.used ? '已使用' : '未使用')+'</td><td>'+(x.source === 'allocated' ? '自动分配' : x.source === 'manual' ? '手动分配' : x.source || '')+'</td><td><button onclick="releasePort('+x.port+')">释放</button></td><td>'+(x.updated_at||'')+'</td></tr>';}).join('');
+ const allocated=await fetch('/api/allocated');
+ const allocatedData=await allocated.json();
+ document.getElementById('allocatedPorts').innerHTML=(allocatedData.data||[]).map(function(x){return '<tr><td>'+x.port+'</td><td>'+(x.service||'')+'</td><td>'+(x.protocol||'')+'</td><td>'+(x.used ? '已使用' : '未使用')+'</td><td>'+(x.source === 'allocated' ? '自动分配' : x.source === 'manual' ? '手动分配' : x.source || '')+'</td><td><button onclick="releasePort('+x.port+')">释放</button></td><td>'+(x.updated_at||'')+'</td></tr>';}).join('');
+ const rangeInfo=await fetch('/api/config/range');
+ const rangeData=await rangeInfo.json();
+ window.rangeCache = rangeData;
+ document.getElementById('currentRange').textContent='TCP: '+rangeData.tcp_port_range+' / UDP: '+rangeData.udp_port_range;
+ document.getElementById('portRange').value=(window.selectedProtocol || 'tcp') === 'udp' ? rangeData.udp_port_range : rangeData.tcp_port_range;
+}
+async function scan(){
+ const res=await fetch('/api/scan');
+ const data=await res.json();
+ document.getElementById('scanPorts').innerHTML=(data.data||[]).map(function(x){return '<tr><td>'+x.port+'</td><td>'+(x.service||'')+'</td><td>'+(x.protocol||'')+'</td><td>'+(x.source||'')+'</td><td>'+(x.updated_at||'')+'</td></tr>';}).join('');
+}
+async function allocate(){
+ const service=document.getElementById('service').value.trim();
+ if(!service){alert('请先填写端口用途');return;}
+ const protocol=window.selectedProtocol || 'tcp';
+ const res=await fetch('/api/allocate?service='+encodeURIComponent(service)+'&protocol='+encodeURIComponent(protocol));
+ if(!res.ok){alert('分配失败');return;}
+ document.getElementById('service').value = '';
+ showTab('managed');
+ await loadPorts();
+}
+window.selectedProtocol='tcp';
+setProtocol('tcp');
+loadPorts();
+scan();
+showTab('scan');
+</script>
+</body>
+</html>

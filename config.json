@@ -1,0 +1,9 @@
+{
+  "app_name": "portview",
+  "server_addr": "0.0.0.0:8079",
+  "data_file": "ports.json",
+  "tcp_port_range": "9100-10000",
+  "udp_port_range": "9100-10000",
+  "refresh_on_get": true,
+  "enable_range_input": true
+}

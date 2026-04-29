@@ -1,0 +1,24 @@
+[
+  {
+    "port": 9000,
+    "service": "test1",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-04-29T15:16:06+08:00"
+  },
+  {
+    "port": 9002,
+    "service": "test2",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "manual",
+    "notes": "",
+    "updated_at": "2026-04-29T15:16:30+08:00"
+  }
+]
