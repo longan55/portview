@@ -20,5 +20,27 @@
     "source": "manual",
     "notes": "",
     "updated_at": "2026-04-29T15:16:30+08:00"
+  },
+  {
+    "port": 9100,
+    "service": "tcp1",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-04-30T10:48:43+08:00"
+  },
+  {
+    "port": 9100,
+    "service": "udp1",
+    "protocol": "udp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-04-30T10:47:51+08:00"
   }
 ]

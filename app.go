@@ -270,7 +270,7 @@ func (a *App) handleAllocate(w http.ResponseWriter, r *http.Request) {
 		a.writeError(w, http.StatusBadRequest, "invalid port range")
 		return
 	}
-	port := a.allocatePortInRange(minPort, maxPort)
+	port := a.allocatePortInRange(minPort, maxPort, protocol)
 	if port == 0 {
 		a.writeError(w, http.StatusConflict, "no available port in range")
 		return
@@ -339,12 +339,10 @@ func getPortRange(cfg Config, protocol string) string {
 	return cfg.TcpPortRange
 }
 
-func (a *App) allocatePortInRange(minPort, maxPort int) int {
+func (a *App) allocatePortInRange(minPort, maxPort int, protocol string) int {
+	protocol = normalizeProtocol(protocol)
 	for p := minPort; p <= maxPort; p++ {
-		if _, ok := a.records[recordKey(p, "tcp")]; ok {
-			continue
-		}
-		if _, ok := a.records[recordKey(p, "udp")]; ok {
+		if _, ok := a.records[recordKey(p, protocol)]; ok {
 			continue
 		}
 		if isPortInUse(p) {
