@@ -1,46 +1,46 @@
 [
   {
-    "port": 9000,
-    "service": "test1",
-    "protocol": "tcp",
-    "reserved": true,
-    "allocated": true,
-    "used": false,
-    "source": "allocated",
-    "notes": "",
-    "updated_at": "2026-04-29T15:16:06+08:00"
-  },
-  {
-    "port": 9002,
-    "service": "test2",
-    "protocol": "tcp",
-    "reserved": true,
-    "allocated": true,
-    "used": false,
-    "source": "manual",
-    "notes": "",
-    "updated_at": "2026-04-29T15:16:30+08:00"
-  },
-  {
     "port": 9100,
-    "service": "tcp1",
+    "service": "112",
     "protocol": "tcp",
     "reserved": true,
     "allocated": true,
     "used": false,
     "source": "allocated",
     "notes": "",
-    "updated_at": "2026-04-30T10:48:43+08:00"
+    "updated_at": "2026-04-30T13:46:09+08:00"
   },
   {
-    "port": 9100,
-    "service": "udp1",
-    "protocol": "udp",
+    "port": 9101,
+    "service": "113",
+    "protocol": "tcp",
     "reserved": true,
     "allocated": true,
     "used": false,
     "source": "allocated",
     "notes": "",
-    "updated_at": "2026-04-30T10:47:51+08:00"
+    "updated_at": "2026-04-30T13:46:51+08:00"
+  },
+  {
+    "port": 9102,
+    "service": "114",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-04-30T13:51:26+08:00"
+  },
+  {
+    "port": 9103,
+    "service": "115",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-04-30T13:51:54+08:00"
   }
 ]

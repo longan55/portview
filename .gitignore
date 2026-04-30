@@ -13,7 +13,8 @@
 *.so
 *.dylib
 build/
-
+log.txt
+*.log
 .sixth
 .vscode
 

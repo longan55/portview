@@ -120,18 +120,22 @@ async function manualAllocate(){
  showTab('managed');
  await loadPorts();
 }
-async function releasePort(port){
- const res=await fetch('/api/ports/release/'+port+'?protocol='+(window.selectedProtocol || 'tcp'),{method:'DELETE'});
- if(!res.ok){alert('释放失败');return;}
+async function releasePort(port, protocol){
+ const res=await fetch('/api/ports/release/'+port+'?protocol='+encodeURIComponent(protocol || 'tcp'),{method:'DELETE'});
+ if(!res.ok){
+  const err=await res.json().catch(function(){return {error:'释放失败'};});
+  alert(err.error||'释放失败');
+  return;
+ }
  await loadPorts();
 }
 async function loadPorts(){
  const res=await fetch('/api/ports');
  const data=await res.json();
- document.getElementById('ports').innerHTML=(data.data||[]).map(function(x){return '<tr><td>'+x.port+'</td><td>'+(x.service||'')+'</td><td>'+(x.protocol||'')+'</td><td>'+(x.used ? '已使用' : '未使用')+'</td><td>'+(x.source === 'allocated' ? '自动分配' : x.source === 'manual' ? '手动分配' : x.source || '')+'</td><td><button onclick="releasePort('+x.port+')">释放</button></td><td>'+(x.updated_at||'')+'</td></tr>';}).join('');
+ document.getElementById('ports').innerHTML=(data.data||[]).map(function(x){return '<tr><td>'+x.port+'</td><td>'+(x.service||'')+'</td><td>'+(x.protocol||'')+'</td><td>'+(x.used ? '已使用' : '未使用')+'</td><td>'+(x.source === 'allocated' ? '自动分配' : x.source === 'manual' ? '手动分配' : x.source || '')+'</td><td><button onclick="releasePort('+x.port+', \''+(x.protocol||'tcp')+'\')">释放</button></td><td>'+(x.updated_at||'')+'</td></tr>';}).join('');
  const allocated=await fetch('/api/allocated');
  const allocatedData=await allocated.json();
- document.getElementById('allocatedPorts').innerHTML=(allocatedData.data||[]).map(function(x){return '<tr><td>'+x.port+'</td><td>'+(x.service||'')+'</td><td>'+(x.protocol||'')+'</td><td>'+(x.used ? '已使用' : '未使用')+'</td><td>'+(x.source === 'allocated' ? '自动分配' : x.source === 'manual' ? '手动分配' : x.source || '')+'</td><td><button onclick="releasePort('+x.port+')">释放</button></td><td>'+(x.updated_at||'')+'</td></tr>';}).join('');
+ document.getElementById('allocatedPorts').innerHTML=(allocatedData.data||[]).map(function(x){return '<tr><td>'+x.port+'</td><td>'+(x.service||'')+'</td><td>'+(x.protocol||'')+'</td><td>'+(x.used ? '已使用' : '未使用')+'</td><td>'+(x.source === 'allocated' ? '自动分配' : x.source === 'manual' ? '手动分配' : x.source || '')+'</td><td><button onclick="releasePort('+x.port+', \''+(x.protocol||'tcp')+'\')">释放</button></td><td>'+(x.updated_at||'')+'</td></tr>';}).join('');
  const rangeInfo=await fetch('/api/config/range');
  const rangeData=await rangeInfo.json();
  window.rangeCache = rangeData;

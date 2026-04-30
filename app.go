@@ -37,6 +37,7 @@ type App struct {
 }
 
 func NewApp(cfg Config) *App {
+	logAction("app.new", map[string]any{"config_path": "config.json", "data_file": cfg.DataFile, "server_addr": cfg.ServerAddr})
 	app := &App{
 		cfg:     cfg,
 		cfgPath: "config.json",
@@ -44,6 +45,7 @@ func NewApp(cfg Config) *App {
 	}
 	tpl, err := loadTemplate("index.html")
 	if err != nil {
+		logAction("app.template.load_failed", map[string]any{"error": err.Error()})
 		panic(err)
 	}
 	app.template = tpl
@@ -52,6 +54,7 @@ func NewApp(cfg Config) *App {
 }
 
 func (a *App) Run() error {
+	logAction("app.run", map[string]any{"server_addr": a.cfg.ServerAddr})
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.handleIndex)
 	mux.HandleFunc("/api/ports", a.handlePorts)
@@ -66,29 +69,43 @@ func (a *App) Run() error {
 }
 
 func (a *App) load() {
+	logAction("data.load", map[string]any{"data_file": a.cfg.DataFile})
 	data, err := os.ReadFile(a.cfg.DataFile)
 	if err != nil {
 		if os.IsNotExist(err) {
+			logAction("data.load_missing", map[string]any{"data_file": a.cfg.DataFile})
 			_ = a.save()
+		} else {
+			logAction("data.load_failed", map[string]any{"data_file": a.cfg.DataFile, "error": err.Error()})
 		}
 		return
 	}
 	var list []PortRecord
 	if err := json.Unmarshal(data, &list); err != nil {
+		logAction("data.load_parse_failed", map[string]any{"data_file": a.cfg.DataFile, "error": err.Error()})
 		return
 	}
+	a.mu.Lock()
 	for _, r := range list {
 		a.records[recordKey(r.Port, r.Protocol)] = r
 	}
+	a.mu.Unlock()
+	logAction("data.load_ok", map[string]any{"records": len(list)})
 }
 
 func (a *App) save() error {
 	list := a.listRecords()
 	data, err := json.MarshalIndent(list, "", "  ")
 	if err != nil {
+		logAction("data.save_failed", map[string]any{"data_file": a.cfg.DataFile, "error": err.Error(), "records": len(list)})
 		return err
 	}
-	return os.WriteFile(a.cfg.DataFile, data, 0644)
+	if err := os.WriteFile(a.cfg.DataFile, data, 0644); err != nil {
+		logAction("data.save_failed", map[string]any{"data_file": a.cfg.DataFile, "error": err.Error(), "records": len(list)})
+		return err
+	}
+	logAction("data.save_ok", map[string]any{"data_file": a.cfg.DataFile, "records": len(list), "snapshot": list})
+	return nil
 }
 
 func (a *App) listRecords() []PortRecord {
@@ -108,6 +125,7 @@ func (a *App) listRecords() []PortRecord {
 }
 
 func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
+	logAction("http.request", map[string]any{"method": r.Method, "path": r.URL.Path, "handler": "index"})
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
@@ -128,15 +146,18 @@ func (a *App) handlePorts(w http.ResponseWriter, r *http.Request) {
 		var req PortRecord
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			a.writeError(w, http.StatusBadRequest, "invalid json")
+			logAction("http.response", map[string]any{"handler": "ports", "method": r.Method, "status": http.StatusBadRequest, "error": "invalid json"})
 			return
 		}
 		req.Protocol = normalizeProtocol(req.Protocol)
 		if req.Port <= 0 || req.Port > 65535 {
 			a.writeError(w, http.StatusBadRequest, "invalid port")
+			logAction("http.response", map[string]any{"handler": "ports", "method": r.Method, "status": http.StatusBadRequest, "error": "invalid port"})
 			return
 		}
 		if req.Service == "" {
 			a.writeError(w, http.StatusBadRequest, "service required")
+			logAction("http.response", map[string]any{"handler": "ports", "method": r.Method, "status": http.StatusBadRequest, "error": "service required"})
 			return
 		}
 		a.mu.Lock()
@@ -145,8 +166,10 @@ func (a *App) handlePorts(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 		_ = a.save()
 		a.writeJSON(w, http.StatusCreated, req)
+		logAction("port.create", map[string]any{"port": req.Port, "protocol": req.Protocol, "service": req.Service, "reserved": req.Reserved, "allocated": req.Allocated, "used": req.Used, "source": req.Source, "notes": req.Notes, "updated_at": req.UpdatedAt})
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		logAction("http.response", map[string]any{"handler": "ports", "method": r.Method, "status": http.StatusMethodNotAllowed})
 	}
 }
 
@@ -173,13 +196,17 @@ func (a *App) handlePortByID(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 		_ = a.save()
 		a.writeJSON(w, http.StatusOK, req)
+		logAction("port.update", map[string]any{"port": req.Port, "protocol": req.Protocol, "service": req.Service, "reserved": req.Reserved, "allocated": req.Allocated, "used": req.Used, "source": req.Source, "notes": req.Notes, "updated_at": req.UpdatedAt})
 	case http.MethodDelete:
 		a.mu.Lock()
+		before := len(a.records)
 		delete(a.records, recordKey(id, "tcp"))
 		delete(a.records, recordKey(id, "udp"))
+		after := len(a.records)
 		a.mu.Unlock()
 		_ = a.save()
 		a.writeJSON(w, http.StatusOK, map[string]string{"message": "deleted"})
+		logAction("port.delete", map[string]any{"port": id, "removed": before - after, "remaining": after})
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -241,38 +268,46 @@ func (a *App) handleRangeConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleReleasePort(w http.ResponseWriter, r *http.Request) {
+	logAction("http.request", map[string]any{"method": r.Method, "path": r.URL.Path, "handler": "release_port"})
 	id, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/api/ports/release/"))
 	if err != nil {
 		a.writeError(w, http.StatusBadRequest, "invalid port id")
+		logAction("http.response", map[string]any{"handler": "release_port", "method": r.Method, "status": http.StatusBadRequest, "error": "invalid port id"})
 		return
 	}
 	protocol := normalizeProtocol(r.URL.Query().Get("protocol"))
+	key := recordKey(id, protocol)
 	a.mu.Lock()
-	delete(a.records, recordKey(id, "tcp"))
-	delete(a.records, recordKey(id, "udp"))
-	if protocol != "" {
-		delete(a.records, recordKey(id, protocol))
+	existing, exists := a.records[key]
+	if exists {
+		delete(a.records, key)
 	}
 	a.mu.Unlock()
 	_ = a.save()
 	a.writeJSON(w, http.StatusOK, map[string]string{"message": "released"})
+	logAction("port.release", map[string]any{"port": id, "protocol": protocol, "exists": exists, "service": existing.Service, "reserved": existing.Reserved, "allocated": existing.Allocated, "used": existing.Used, "source": existing.Source, "notes": existing.Notes, "updated_at": existing.UpdatedAt, "key": key})
+	logAction("http.response", map[string]any{"handler": "release_port", "method": r.Method, "status": http.StatusOK, "port": id, "protocol": protocol})
 }
 
 func (a *App) handleAllocate(w http.ResponseWriter, r *http.Request) {
+	logAction("http.request", map[string]any{"method": r.Method, "path": r.URL.Path, "handler": "allocate"})
 	service := strings.TrimSpace(r.URL.Query().Get("service"))
 	protocol := normalizeProtocol(r.URL.Query().Get("protocol"))
 	if service == "" {
 		a.writeError(w, http.StatusBadRequest, "service required")
+		logAction("http.response", map[string]any{"handler": "allocate", "method": r.Method, "status": http.StatusBadRequest, "error": "service required"})
 		return
 	}
 	minPort, maxPort := parsePortRange(getPortRange(a.cfg, protocol))
 	if minPort == 0 || maxPort == 0 {
 		a.writeError(w, http.StatusBadRequest, "invalid port range")
+		logAction("http.response", map[string]any{"handler": "allocate", "method": r.Method, "status": http.StatusBadRequest, "error": "invalid port range"})
 		return
 	}
 	port := a.allocatePortInRange(minPort, maxPort, protocol)
 	if port == 0 {
 		a.writeError(w, http.StatusConflict, "no available port in range")
+		logAction("http.response", map[string]any{"handler": "allocate", "method": r.Method, "status": http.StatusConflict, "error": "no available port in range"})
 		return
 	}
 	rec := PortRecord{Port: port, Service: service, Protocol: protocol, Reserved: true, Allocated: true, Used: isPortInUse(port), Source: "allocated", UpdatedAt: nowString()}
@@ -281,27 +316,34 @@ func (a *App) handleAllocate(w http.ResponseWriter, r *http.Request) {
 	a.mu.Unlock()
 	_ = a.save()
 	a.writeJSON(w, http.StatusOK, rec)
+	logAction("port.allocate", map[string]any{"port": rec.Port, "protocol": rec.Protocol, "service": rec.Service, "reserved": rec.Reserved, "allocated": rec.Allocated, "used": rec.Used, "source": rec.Source, "updated_at": rec.UpdatedAt, "range_min": minPort, "range_max": maxPort, "key": recordKey(port, protocol)})
+	logAction("http.response", map[string]any{"handler": "allocate", "method": r.Method, "status": http.StatusOK, "port": port, "protocol": protocol, "service": service})
 }
 
 func (a *App) handleManualAllocate(w http.ResponseWriter, r *http.Request) {
+	logAction("http.request", map[string]any{"method": r.Method, "path": r.URL.Path, "handler": "manual_allocate"})
 	service := strings.TrimSpace(r.URL.Query().Get("service"))
 	protocol := normalizeProtocol(r.URL.Query().Get("protocol"))
 	if service == "" {
 		a.writeError(w, http.StatusBadRequest, "service required")
+		logAction("http.response", map[string]any{"handler": "manual_allocate", "method": r.Method, "status": http.StatusBadRequest, "error": "service required"})
 		return
 	}
 	port, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("port")))
 	if err != nil || port <= 0 || port > 65535 {
 		a.writeError(w, http.StatusBadRequest, "invalid port")
+		logAction("http.response", map[string]any{"handler": "manual_allocate", "method": r.Method, "status": http.StatusBadRequest, "error": "invalid port"})
 		return
 	}
 	minPort, maxPort := parsePortRange(getPortRange(a.cfg, protocol))
 	if minPort == 0 || maxPort == 0 || port < minPort || port > maxPort {
 		a.writeError(w, http.StatusBadRequest, "port out of range")
+		logAction("http.response", map[string]any{"handler": "manual_allocate", "method": r.Method, "status": http.StatusBadRequest, "error": "port out of range"})
 		return
 	}
 	if isPortInUse(port) {
 		a.writeError(w, http.StatusConflict, "port already in use")
+		logAction("http.response", map[string]any{"handler": "manual_allocate", "method": r.Method, "status": http.StatusConflict, "error": "port already in use"})
 		return
 	}
 	a.mu.RLock()
@@ -309,6 +351,7 @@ func (a *App) handleManualAllocate(w http.ResponseWriter, r *http.Request) {
 	a.mu.RUnlock()
 	if exists {
 		a.writeError(w, http.StatusConflict, "port already allocated")
+		logAction("http.response", map[string]any{"handler": "manual_allocate", "method": r.Method, "status": http.StatusConflict, "error": "port already allocated"})
 		return
 	}
 	rec := PortRecord{Port: port, Service: service, Protocol: protocol, Reserved: true, Allocated: true, Used: false, Source: "manual", UpdatedAt: nowString()}
@@ -317,6 +360,8 @@ func (a *App) handleManualAllocate(w http.ResponseWriter, r *http.Request) {
 	a.mu.Unlock()
 	_ = a.save()
 	a.writeJSON(w, http.StatusOK, rec)
+	logAction("port.allocate.manual", map[string]any{"port": rec.Port, "protocol": rec.Protocol, "service": rec.Service, "reserved": rec.Reserved, "allocated": rec.Allocated, "used": rec.Used, "source": rec.Source, "updated_at": rec.UpdatedAt, "key": recordKey(port, protocol)})
+	logAction("http.response", map[string]any{"handler": "manual_allocate", "method": r.Method, "status": http.StatusOK, "port": port, "protocol": protocol, "service": service})
 }
 
 func parsePortRange(value string) (int, int) {
@@ -505,12 +550,18 @@ func loadTemplate(path string) (*template.Template, error) {
 }
 
 func (a *App) saveConfig() error {
-	fmt.Printf("config: %+v\n", a.cfg)
+	logAction("config.save", map[string]any{"config_path": a.cfgPath, "cfg": a.cfg})
 	data, err := json.MarshalIndent(a.cfg, "", "  ")
 	if err != nil {
+		logAction("config.save_failed", map[string]any{"config_path": a.cfgPath, "error": err.Error()})
 		return err
 	}
-	return os.WriteFile(a.cfgPath, data, 0644)
+	if err := os.WriteFile(a.cfgPath, data, 0644); err != nil {
+		logAction("config.save_failed", map[string]any{"config_path": a.cfgPath, "error": err.Error()})
+		return err
+	}
+	logAction("config.save_ok", map[string]any{"config_path": a.cfgPath})
+	return nil
 }
 
 func isPortInUse(port int) bool {

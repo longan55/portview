@@ -5,6 +5,8 @@ import (
 )
 
 func main() {
+	initLogger()
+	logAction("startup", map[string]any{"config": "config.json"})
 	cfg, err := LoadConfig("config.json")
 	if err != nil {
 		log.Fatalf("load config: %v", err)
