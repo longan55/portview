@@ -17,6 +17,7 @@ log.txt
 *.log
 .sixth
 .vscode
+ports.json
 
 # Test binary, built with `go test -c`
 *.test

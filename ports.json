@@ -1,6 +1,61 @@
 [
   {
-    "port": 9100,
+    "port": 136,
+    "service": "11135",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-05-05T18:19:58+08:00"
+  },
+  {
+    "port": 134,
+    "service": "11134",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-05-05T18:19:32+08:00"
+  },
+  {
+    "port": 9107,
+    "service": "new",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-05-05T18:15:42+08:00"
+  },
+  {
+    "port": 9106,
+    "service": "hh1",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-05-05T18:09:40+08:00"
+  },
+  {
+    "port": 9105,
+    "service": "hhhh",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-05-05T18:05:04+08:00"
+  },
+  {
+    "port": 9104,
     "service": "112",
     "protocol": "tcp",
     "reserved": true,
@@ -8,18 +63,18 @@
     "used": false,
     "source": "allocated",
     "notes": "",
-    "updated_at": "2026-04-30T13:46:09+08:00"
+    "updated_at": "2026-05-05T18:04:43+08:00"
   },
   {
-    "port": 9101,
-    "service": "113",
+    "port": 9103,
+    "service": "115",
     "protocol": "tcp",
     "reserved": true,
     "allocated": true,
     "used": false,
     "source": "allocated",
     "notes": "",
-    "updated_at": "2026-04-30T13:46:51+08:00"
+    "updated_at": "2026-04-30T13:51:54+08:00"
   },
   {
     "port": 9102,
@@ -33,14 +88,25 @@
     "updated_at": "2026-04-30T13:51:26+08:00"
   },
   {
-    "port": 9103,
-    "service": "115",
+    "port": 9101,
+    "service": "113",
     "protocol": "tcp",
     "reserved": true,
     "allocated": true,
     "used": false,
     "source": "allocated",
     "notes": "",
-    "updated_at": "2026-04-30T13:51:54+08:00"
+    "updated_at": "2026-04-30T13:46:51+08:00"
+  },
+  {
+    "port": 9100,
+    "service": "112",
+    "protocol": "tcp",
+    "reserved": true,
+    "allocated": true,
+    "used": false,
+    "source": "allocated",
+    "notes": "",
+    "updated_at": "2026-04-30T13:46:09+08:00"
   }
 ]

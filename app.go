@@ -115,11 +115,14 @@ func (a *App) listRecords() []PortRecord {
 	for _, r := range a.records {
 		list = append(list, r)
 	}
+	// sort.Slice(list, func(i, j int) bool {
+	// 	if list[i].Port == list[j].Port {
+	// 		return list[i].Protocol < list[j].Protocol
+	// 	}
+	// 	return list[i].Port < list[j].Port
+	// })
 	sort.Slice(list, func(i, j int) bool {
-		if list[i].Port == list[j].Port {
-			return list[i].Protocol < list[j].Protocol
-		}
-		return list[i].Port < list[j].Port
+		return list[i].UpdatedAt > list[j].UpdatedAt
 	})
 	return list
 }
@@ -227,10 +230,7 @@ func (a *App) handleAllocated(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sort.Slice(list, func(i, j int) bool {
-		if list[i].Port == list[j].Port {
-			return list[i].Protocol < list[j].Protocol
-		}
-		return list[i].Port < list[j].Port
+		return list[i].UpdatedAt > list[j].UpdatedAt
 	})
 	a.writeJSON(w, http.StatusOK, map[string]any{"data": list})
 }
